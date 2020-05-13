@@ -5,7 +5,7 @@ import "net"
 import "os"
 import "net/rpc"
 import "net/http"
-import "fmt"
+// import "fmt"
 import "sync"
 import "strconv"
 type Master struct {
@@ -44,7 +44,7 @@ func (m *Master) Takefiles(giver *Giver, taker *Taker) error {
 				prime=true;
 			}
 		}else {
-			fmt.Printf("2\n")
+			// fmt.Printf("2\n")
 			for i:=0;i<n;i++{
 				if(!aa[i]){
 					taker.File=filesarr[i];
@@ -65,7 +65,7 @@ func (m *Master) Takefiles(giver *Giver, taker *Taker) error {
 			ac=fc;
 			aa=fa;
 			taker.Prime=false   //Issue here, changes made here are not getting to worker's TAKER variable, just it is still true in worker.
-			fmt.Printf("print this ",taker.Prime)
+			// fmt.Printf("print this ",taker.Prime)
 			prime=false;
 		}else{
 			//fmt.Printf("5\n")
@@ -81,7 +81,7 @@ func (m *Master) Completemapf(args *Taker, reply *string) error {
 	mu.Lock();
 	fc++;
 	fa[args.Fileindex]=true;
-	//fmt.Printf("compelte hua %v\n",args.File)
+	// fmt.Printf("compelte hua %v\n",args.File)
 	mu.Unlock()
 	return nil
 }

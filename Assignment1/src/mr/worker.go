@@ -17,6 +17,15 @@ type KeyValue struct {
 	Value string
 }
 
+
+// for sorting by key.
+type ByKey []KeyValue
+
+// for sorting by key.
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
+
 //
 // use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
@@ -43,8 +52,11 @@ func Worker(mapf func(string, string) []KeyValue,
 		giver.Prime=false
 		for !mapfcomp{
 			call("Master.Takefiles",&giver,&taker);
-			fmt.Printf("%+v \n " taker)
-			if(taker.Mapfcomp){
+			// fmt.Printf("%+v \n " ,taker)
+			if(giver.Prime){
+				giver.Prime=false;
+				taker.Prime=false;
+			}else if(taker.Mapfcomp){
 				// when fc==ac in master.go
 				mapfcomp=true;
 				break;
@@ -65,8 +77,8 @@ func Worker(mapf func(string, string) []KeyValue,
 				if err != nil {
 					log.Fatalf("cannot read %v", taker.File)
 				}
-				file.Close()
 				kva := mapf(taker.File, string(content))
+				file.Close()
 				for i:=0;i<len(kva);i++{
 					hashval:= ihash(kva[i].Key) % taker.Nreduce;
 					oname :=strconv.Itoa(hashval)+ strconv.Itoa(taker.Fileindex);
@@ -75,7 +87,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				        fmt.Printf("error opening %s: %s", oname, err)
 				        return
 				    }
-					if _, err := f.WriteString(kva[i].Key+"\n"); err != nil {
+					if _, err := f.WriteString(kva[i].Key+"+"+kva[i].Value+"\n"); err != nil {
 						log.Println(err)
 					}
 				    f.Close()
@@ -98,11 +110,11 @@ func Worker(mapf func(string, string) []KeyValue,
 				break;
 			}else if get.Prime{
 				put.Prime=true;
-				time.Sleep(2 * time.Second)
+				time.Sleep(10 * time.Second)
 			}else if get.Sleep{
-				time.Sleep(1* time.Second);
+				time.Sleep(2* time.Second);
 			}else{
-				intermediate:=[]string{}
+				inter:=[]string{}
 				for i:=0;i<get.Total;i++{
 					oname:= strconv.Itoa(get.Index)+ strconv.Itoa(i);
 					file, err := os.Open(oname)
@@ -116,33 +128,41 @@ func Worker(mapf func(string, string) []KeyValue,
 					lines := strings.Split(string(content), "\n")
 					final:=[]string{}
 					final=append(final,lines...)	
-					intermediate = append(intermediate, final...)
+					inter = append(inter, final...)
 					file.Close()
 				}
-				sort.Strings(intermediate)
-
+				intermediate := []KeyValue{}
+				for i:=0;i<len(inter);i++{
+					pp:=strings.Split(string(inter[i]), "+")	
+					if(len(pp)==2){
+						g:=KeyValue{}	
+						g.Key= pp[0]
+						g.Value= pp[1]
+						intermediate = append(intermediate, g)
+					}
+				}
+				sort.Sort(ByKey(intermediate))
 				oname := "mr-out-"+ strconv.Itoa(get.Index)
 				ofile, _ := os.Create(oname)
 
 				i := 0
 				for i < len(intermediate) {
 					j := i + 1
-					for j < len(intermediate) && intermediate[j] == intermediate[i] {
+					for j < len(intermediate) && intermediate[j].Key == intermediate[i].Key {
 						j++
 					}
 					values := []string{}
 					for k := i; k < j; k++ {
-						values = append(values, "1")
+						values = append(values, intermediate[k].Value)
 					}
-					if(intermediate[i]!=""){
-						output := reducef(intermediate[i], values)
-						// this is the correct format for each line of Reduce output.
-						fmt.Fprintf(ofile, "%v %v\n", intermediate[i], output)
-					}
+					output := reducef(intermediate[i].Key, values)
+					
+					// this is the correct format for each line of Reduce output.
+					fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
+
 					i = j
 				}
-				ofile.Close()
-			}
+				}
 
 			call("Master.Completereducef",&get,&dummy)
 		}
@@ -166,6 +186,6 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 		return true
 	}
 
-	fmt.Println(err)
+	// fmt.Println(err)
 	return false
 }
